@@ -6,9 +6,9 @@ import (
 )
 
 func main() {
-	gatorConf, err := config.Read()
-	if err != nil {
-		fmt.Printf("\nThere was an error reading the configuration: %v\n", err)
+	setErr := config.SetUser("Mr-Rafael")
+	if setErr != nil {
+		fmt.Printf("\nThere was an error setting the user: %v\n", setErr)
 	}
-	fmt.Printf("\nCurrent Gator configuration: %v\n", gatorConf)
+	config.PrintCurrentConfig()
 }
