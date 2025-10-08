@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"errors"
+	"os"
 	"github.com/Mr-Rafael/gator/internal/config"
 )
 
@@ -20,6 +21,21 @@ type commands struct {
 }
 
 func main() {
+	fmt.Println("Reading user args")
+	args := os.Args
+	if len(args) < 2 {
+		fmt.Println("Error: Received less arguments than expected")
+		return
+	}
+	loginCommand := getCommand(args)
+
+	fmt.Println("Setting up valid commands")
+	validCommands := make(map[string]func(*state, command) error)
+	commands := commands{
+		ValidCommands: validCommands,
+	}
+	commands.register("login", handlerLogin)
+
 	fmt.Println("Setting up state struct")
 	currentConf, err := config.Read()
 	if err != nil {
@@ -30,12 +46,8 @@ func main() {
 	}
 	fmt.Printf("Succesfully set up state:\n|%s|\n", currentState)
 
-	loginCommand := command{
-		Name: "login",
-		Arguments: []string{"MR"},
-	}
-	fmt.Println("Running command %s", loginCommand)
-	err = handlerLogin(currentState, loginCommand)
+	fmt.Println("Attempting to run command")
+	err =commands.run(currentState, loginCommand)
 	if err != nil {
 		fmt.Printf("\nError running login command: |%v|\n", err)
 	}
@@ -59,6 +71,15 @@ func updateConfig(s *state) {
 	}
 	s.Configuration = &updatedConfig
 	fmt.Printf("\n|Successfully Updated Config|: %s\n", s.Configuration)
+}
+
+func getCommand(arguments []string) command {
+	commandName := arguments[1]
+	commandArguments := arguments[2:]
+	return command{
+		Name: commandName,
+		Arguments: commandArguments,
+	}
 }
 
 func (c *commands) run(s *state, cmd command) error {
