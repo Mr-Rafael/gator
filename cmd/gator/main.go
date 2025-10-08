@@ -25,7 +25,7 @@ func main() {
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("Error: Received less arguments than expected")
-		return
+		os.Exit(1)
 	}
 	loginCommand := getCommand(args)
 
@@ -44,12 +44,13 @@ func main() {
 	currentState := &state{
 		Configuration: &currentConf,
 	}
-	fmt.Printf("Succesfully set up state:\n|%s|\n", currentState)
+	fmt.Printf("Succesfully set up state.")
 
 	fmt.Println("Attempting to run command")
 	err =commands.run(currentState, loginCommand)
 	if err != nil {
-		fmt.Printf("\nError running login command: |%v|\n", err)
+		fmt.Printf("\nError running command: |%v|\n", err)
+		os.Exit(1)
 	}
 }
 
