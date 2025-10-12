@@ -37,6 +37,7 @@ func main() {
 	}
 	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
+	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
 	fmt.Println("Reading configuration file")
@@ -54,7 +55,7 @@ func main() {
 		Configuration: &currentConf,
 		db: dbQueries,
 	}
-	fmt.Printf("Succesfully set up state.")
+	fmt.Println("Succesfully set up state.")
 
 	fmt.Println("Reading user args")
 	args := os.Args
@@ -114,6 +115,14 @@ func handlerRegister(s *state, cmd command) error {
 	config.SetUser(userName)
 	updateConfig(s)
 	fmt.Printf("The user was successfully created: %s", userData)
+	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	err := s.db.ResetUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error clearing the users table: %v", err)
+	}
 	return nil
 }
 
