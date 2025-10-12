@@ -62,6 +62,14 @@ func getConfigFilePath() (string, error) {
 	return filePath, nil
 }
 
+func GetCurrentUser() (string, error) {
+	currentConfig, err := Read()
+	if err != nil {
+		return "", fmt.Errorf("\nError: Failed to read the current configuration. %v\n", err)
+	}
+	return currentConfig.CurrentUserName, nil
+}
+
 func PrintCurrentConfig() {
 	currentConfig, err := Read()
 	if err != nil {

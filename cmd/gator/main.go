@@ -8,6 +8,7 @@ import (
 	"os"
 	"context"
 	"time"
+	"encoding/json"
 	"database/sql"
 	"github.com/google/uuid"
 	"github.com/Mr-Rafael/gator/internal/config"
@@ -37,6 +38,7 @@ func main() {
 	}
 	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
+	commands.register("users", handlerUsers)
 	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
@@ -55,7 +57,7 @@ func main() {
 		Configuration: &currentConf,
 		db: dbQueries,
 	}
-	fmt.Println("Succesfully set up state.")
+	fmt.Println("Succesfully set up state")
 
 	fmt.Println("Reading user args")
 	args := os.Args
@@ -84,7 +86,7 @@ func handlerLogin(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("Error getting the user: %v", err)
 	}
-	fmt.Printf("\nFound the user: %s\n", userData)
+	printStruct("Found the user:", userData)
 
 	config.SetUser(userName)
 	updateConfig(s)
@@ -97,8 +99,6 @@ func handlerRegister(s *state, cmd command) error {
 		return errors.New("Error: expected an argument for the login function, and found 0")
 	}
 	
-	creationTimeStamp := time.Now()
-	fmt.Println("\nCreating the user at timestamp: %v\n", creationTimeStamp)
 	userName := cmd.Arguments[0]
 	creationParams := database.CreateUserParams {	
 		ID: uuid.New(),
@@ -114,7 +114,29 @@ func handlerRegister(s *state, cmd command) error {
 
 	config.SetUser(userName)
 	updateConfig(s)
-	fmt.Printf("The user was successfully created: %s", userData)
+	printStruct("The user was successfully created:", userData)
+	return nil
+}
+
+func handlerUsers(s *state, cmd command) error {
+	currentUser, err := config.GetCurrentUser()
+	if err != nil {
+		return fmt.Errorf("Error reading the current user: %v", err)
+	}
+
+	usersData, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error getting the user list: %v", err)
+	}
+
+	for _, userData := range usersData {
+		if userData.Name == currentUser {
+			fmt.Printf("\n* %v (current)", userData.Name)
+		} else {
+			fmt.Printf("\n* %v", userData.Name)
+		}
+	}
+	fmt.Println()
 	return nil
 }
 
@@ -132,7 +154,7 @@ func updateConfig(s *state) {
 		fmt.Printf("\nError while updating config: %v", err)
 	}
 	s.Configuration = &updatedConfig
-	fmt.Printf("\n|Successfully Updated Config|: %s\n", s.Configuration)
+	printStruct("Successfully updated config:", s.Configuration)
 }
 
 func getCommand(arguments []string) command {
@@ -151,4 +173,13 @@ func (c *commands) run(s *state, cmd command) error {
 
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.ValidCommands[name] = f
+}
+
+func printStruct(description string, inter interface{}) {
+	readable, err := json.MarshalIndent(inter, "", "  ")
+	if err != nil {
+		fmt.Printf("\nError preparing struct for printing: %v", err)
+		return
+	}
+	fmt.Printf("\n%v\n%v\n", description, string(readable))
 }
