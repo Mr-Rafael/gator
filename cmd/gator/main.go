@@ -41,6 +41,7 @@ func main() {
 	commands.register("register", handlerRegister)
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
+	commands.register("addfeed", handlerAddFeed)
 	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
@@ -151,11 +152,45 @@ func handlerReset(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	url := "https://www.wagslane.dev/index.xml"
+	feed, err := rss.FetchFeed(context.Background(), url)
 	if err != nil {
 		fmt.Printf("\nError fetching the feed: %v\n", err)
 	}
 	printStruct("Obtained the following feed:", feed)
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.Arguments) < 2 {
+		return fmt.Errorf("Error: expected 2 arguments (name, url), and found %v", len(cmd.Arguments))
+	}
+	feedName := cmd.Arguments[0]
+	feedURL := cmd.Arguments[1]
+	userName, err := config.GetCurrentUser()
+	if err != nil {
+		return fmt.Errorf("Error reading the current user from configuration: %v", err)
+	}
+	userData, err := s.db.GetUser(context.Background(), userName)
+	if err != nil {
+		return fmt.Errorf("Error querying the user data: %v", err)
+	}
+
+	creationParams := database.CreateFeedParams {	
+		ID: uuid.New(),
+		Name: feedName,
+		Url: feedURL,
+		UserID: userData.ID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	feedData, err := s.db.CreateFeed(context.Background(), creationParams)
+	if err != nil {
+		return fmt.Errorf("Error inserting the feed: %v", err)
+	}
+
+	printStruct("The feed was successfully created", feedData)
 	return nil
 }
 
@@ -178,8 +213,12 @@ func getCommand(arguments []string) command {
 }
 
 func (c *commands) run(s *state, cmd command) error {
-	error := c.ValidCommands[cmd.Name](s, cmd)
-	return error
+	if handler, ok := c.ValidCommands[cmd.Name]; ok && handler != nil {
+    	handler(s, cmd)
+	} else {
+    	return fmt.Errorf("Unknown or unregistered command: '%v'", cmd.Name)
+	}
+	return nil
 }
 
 func (c *commands) register(name string, f func(*state, command) error) {
