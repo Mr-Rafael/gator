@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/Mr-Rafael/gator/internal/config"
 	"github.com/Mr-Rafael/gator/internal/database"
+	"github.com/Mr-Rafael/gator/internal/rss"
 )
 
 type state struct {
@@ -39,6 +40,7 @@ func main() {
 	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
 	commands.register("users", handlerUsers)
+	commands.register("agg", handlerAgg)
 	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
@@ -145,6 +147,15 @@ func handlerReset(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("Error clearing the users table: %v", err)
 	}
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		fmt.Printf("\nError fetching the feed: %v\n", err)
+	}
+	printStruct("Obtained the following feed:", feed)
 	return nil
 }
 
