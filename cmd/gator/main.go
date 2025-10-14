@@ -42,6 +42,7 @@ func main() {
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
 	commands.register("addfeed", handlerAddFeed)
+	commands.register("feeds", handlerFeeds)
 	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
@@ -148,6 +149,10 @@ func handlerReset(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("Error clearing the users table: %v", err)
 	}
+	err = s.db.ResetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error clearing the feeds table: %v", err)
+	}
 	return nil
 }
 
@@ -191,6 +196,17 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 
 	printStruct("The feed was successfully created", feedData)
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	feedsData, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("Failed to fetch data from the database: %v", err)
+	}
+	for _, feedData := range feedsData {
+		printStruct("", feedData)
+	}
 	return nil
 }
 

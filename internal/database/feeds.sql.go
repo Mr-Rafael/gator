@@ -54,3 +54,12 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (Feed, e
 	)
 	return i, err
 }
+
+const resetFeeds = `-- name: ResetFeeds :exec
+DELETE FROM feeds
+`
+
+func (q *Queries) ResetFeeds(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, resetFeeds)
+	return err
+}
