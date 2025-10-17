@@ -10,5 +10,10 @@ VALUES (
 )
 RETURNING *;
 
+-- name: GetFeedFromURL :one
+SELECT *
+FROM feeds
+WHERE url = $1;
+
 -- name: ResetFeeds :exec
 DELETE FROM feeds;

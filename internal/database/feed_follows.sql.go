@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createFeedFollow = `-- name: CreateFeedFollow :many
+const createFeedFollow = `-- name: CreateFeedFollow :one
 WITH inserted AS (
     INSERT INTO feed_follows (id, created_at, updated_at, user_id, feed_id)
     VALUES (
@@ -22,13 +22,14 @@ WITH inserted AS (
         $4,
         $5
     )
+    RETURNING id, user_id, feed_id
 )
-SELECT users.id, users.created_at, users.updated_at, users.name, feeds.id, feeds.name, url, user_id, feeds.created_at, feeds.updated_at
-FROM inserted id
+SELECT i.id, i.user_id, feed_id, users.id, users.created_at, users.updated_at, users.name, feeds.id, feeds.name, url, feeds.user_id, feeds.created_at, feeds.updated_at
+FROM inserted i
 INNER JOIN users
     ON i.user_id = users.id
 INNER JOIN feeds
-    ON i.feed_id = feeds.i
+    ON i.feed_id = feeds.id
 `
 
 type CreateFeedFollowParams struct {
@@ -41,53 +42,43 @@ type CreateFeedFollowParams struct {
 
 type CreateFeedFollowRow struct {
 	ID          uuid.UUID
+	UserID      uuid.UUID
+	FeedID      uuid.UUID
+	ID_2        uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Name        string
-	ID_2        uuid.UUID
+	ID_3        uuid.UUID
 	Name_2      string
 	Url         string
-	UserID      uuid.UUID
+	UserID_2    uuid.UUID
 	CreatedAt_2 time.Time
 	UpdatedAt_2 time.Time
 }
 
-func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowParams) ([]CreateFeedFollowRow, error) {
-	rows, err := q.db.QueryContext(ctx, createFeedFollow,
+func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowParams) (CreateFeedFollowRow, error) {
+	row := q.db.QueryRowContext(ctx, createFeedFollow,
 		arg.ID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.UserID,
 		arg.FeedID,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []CreateFeedFollowRow
-	for rows.Next() {
-		var i CreateFeedFollowRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.ID_2,
-			&i.Name_2,
-			&i.Url,
-			&i.UserID,
-			&i.CreatedAt_2,
-			&i.UpdatedAt_2,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	var i CreateFeedFollowRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FeedID,
+		&i.ID_2,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.ID_3,
+		&i.Name_2,
+		&i.Url,
+		&i.UserID_2,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
+	)
+	return i, err
 }

@@ -1,4 +1,4 @@
--- name: CreateFeedFollow :many
+-- name: CreateFeedFollow :one
 WITH inserted AS (
     INSERT INTO feed_follows (id, created_at, updated_at, user_id, feed_id)
     VALUES (
@@ -8,10 +8,11 @@ WITH inserted AS (
         $4,
         $5
     )
+    RETURNING id, user_id, feed_id
 )
 SELECT *
-FROM inserted id
+FROM inserted i
 INNER JOIN users
     ON i.user_id = users.id
 INNER JOIN feeds
-    ON i.feed_id = feeds.i;
+    ON i.feed_id = feeds.id;

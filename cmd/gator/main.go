@@ -43,6 +43,7 @@ func main() {
 	commands.register("agg", handlerAgg)
 	commands.register("addfeed", handlerAddFeed)
 	commands.register("feeds", handlerFeeds)
+	commands.register("follow", handlerFollow)
 	commands.register("reset", handlerReset)
 
 	fmt.Println("Setting up state struct")
@@ -210,6 +211,43 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
+func handlerFollow(s * state, cmd command) error {
+	if len(cmd.Arguments) < 1 {
+		return fmt.Errorf("Error: expected 1 argument (url), and found %v", len(cmd.Arguments))
+	}
+	feedURL := cmd.Arguments[0]
+
+	userName, err := config.GetCurrentUser()
+	if err != nil {
+		return fmt.Errorf("Error reading the current user from configuration: %v", err)
+	}
+	userData, err := s.db.GetUser(context.Background(), userName)
+	if err != nil {
+		return fmt.Errorf("Error querying the user data: %v", err)
+	}
+
+	feedData, err := s.db.GetFeedFromURL(context.Background(), feedURL)
+	if err != nil {
+		return fmt.Errorf("Error getting the feed data: %v", err)
+	}
+
+	creationParams := database.CreateFeedFollowParams {
+		ID: uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID: userData.ID,
+		FeedID: feedData.ID,
+	}
+
+	followData, err := s.db.CreateFeedFollow(context.Background(), creationParams)
+	if err != nil {
+		return fmt.Errorf("Error creating follow in the database: %v", err)
+	}
+
+	fmt.Printf("\nUser %v is now following feed %v.\n", followData.Name, followData.Name_2)
+	return nil
+}
+
 func updateConfig(s *state) {
 	updatedConfig, err := config.Read()
 	if err != nil {
@@ -230,7 +268,10 @@ func getCommand(arguments []string) command {
 
 func (c *commands) run(s *state, cmd command) error {
 	if handler, ok := c.ValidCommands[cmd.Name]; ok && handler != nil {
-    	handler(s, cmd)
+    	err := handler(s, cmd)
+		if err != nil {
+			fmt.Printf("\nError running the command: %v\n", err)
+		}
 	} else {
     	return fmt.Errorf("Unknown or unregistered command: '%v'", cmd.Name)
 	}
