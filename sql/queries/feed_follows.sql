@@ -16,3 +16,10 @@ INNER JOIN users
     ON i.user_id = users.id
 INNER JOIN feeds
     ON i.feed_id = feeds.id;
+
+-- name: GetFeedFollowsForUser :many
+SELECT feed_follows.user_id, feed_follows.feed_id, name, url
+FROM feed_follows
+INNER JOIN feeds
+    ON feed_follows.feed_id = feeds.id
+WHERE feed_follows.user_id = $1;
