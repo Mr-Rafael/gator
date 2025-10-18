@@ -4,30 +4,17 @@ import _ "github.com/lib/pq"
 
 import (
 	"fmt"
-	"errors"
 	"os"
 	"context"
-	"time"
 	"encoding/json"
 	"database/sql"
-	"github.com/google/uuid"
 	"github.com/Mr-Rafael/gator/internal/config"
 	"github.com/Mr-Rafael/gator/internal/database"
-	"github.com/Mr-Rafael/gator/internal/rss"
 )
 
 type state struct {
 	db *database.Queries
 	Configuration *config.Config
-}
-
-type command struct {
-	Name string
-	Arguments []string
-}
-
-type commands struct {
-	ValidCommands map[string]func(*state, command) error
 }
 
 func main() {
@@ -73,204 +60,6 @@ func main() {
 	}
 }
 
-func handlerLogin(s *state, cmd command) error {
-	if len(cmd.Arguments) < 1 {
-		return errors.New("Error: expected an argument for the login function, and found 0")
-	}
-	userName := cmd.Arguments[0]
-
-	fmt.Printf("\nSearching for the user %v on the database.\n", userName)
-	userData, err := s.db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("Error getting the user: %v", err)
-	}
-	printStruct("Found the user:", userData)
-
-	config.SetUser(userName)
-	updateConfig(s)
-
-	return nil
-}
-
-func handlerRegister(s *state, cmd command) error {
-	if len(cmd.Arguments) < 1 {
-		return errors.New("Error: expected an argument for the login function, and found 0")
-	}
-	
-	userName := cmd.Arguments[0]
-	creationParams := database.CreateUserParams {	
-		ID: uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Name: userName,
-	}
-
-	userData, err := s.db.CreateUser(context.Background(), creationParams)
-	if err != nil {
-		return fmt.Errorf("Error creating the user: %v", err)
-	}
-
-	config.SetUser(userName)
-	updateConfig(s)
-	printStruct("The user was successfully created:", userData)
-	return nil
-}
-
-func handlerUsers(s *state, cmd command) error {
-	currentUser, err := config.GetCurrentUser()
-	if err != nil {
-		return fmt.Errorf("Error reading the current user: %v", err)
-	}
-
-	usersData, err := s.db.GetUsers(context.Background())
-	if err != nil {
-		return fmt.Errorf("Error getting the user list: %v", err)
-	}
-
-	for _, userData := range usersData {
-		if userData.Name == currentUser {
-			fmt.Printf("\n* %v (current)", userData.Name)
-		} else {
-			fmt.Printf("\n* %v", userData.Name)
-		}
-	}
-	fmt.Println()
-	return nil
-}
-
-func handlerReset(s *state, cmd command) error {
-	err := s.db.ResetUsers(context.Background())
-	if err != nil {
-		return fmt.Errorf("Error clearing the users table: %v", err)
-	}
-	err = s.db.ResetFeeds(context.Background())
-	if err != nil {
-		return fmt.Errorf("Error clearing the feeds table: %v", err)
-	}
-	err = s.db.ResetFeedFollows(context.Background())
-	if err != nil {
-		return fmt.Errorf("Error clearing the feed follows table: %v", err)
-	}
-	return nil
-}
-
-func handlerAgg(s *state, cmd command) error {
-	url := "https://www.wagslane.dev/index.xml"
-	feed, err := rss.FetchFeed(context.Background(), url)
-	if err != nil {
-		fmt.Printf("\nError fetching the feed: %v\n", err)
-	}
-	printStruct("Obtained the following feed:", feed)
-	return nil
-}
-
-func handlerAddFeed(s *state, cmd command) error {
-	if len(cmd.Arguments) < 2 {
-		return fmt.Errorf("Error: expected 2 arguments (name, url), and found %v", len(cmd.Arguments))
-	}
-	feedName := cmd.Arguments[0]
-	feedURL := cmd.Arguments[1]
-	userName, err := config.GetCurrentUser()
-	if err != nil {
-		return fmt.Errorf("Error reading the current user from configuration: %v", err)
-	}
-	userData, err := s.db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("Error querying the user data: %v", err)
-	}
-
-	feedCreationParams := database.CreateFeedParams {	
-		ID: uuid.New(),
-		Name: feedName,
-		Url: feedURL,
-		UserID: userData.ID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	feedData, err := s.db.CreateFeed(context.Background(), feedCreationParams)
-	if err != nil {
-		return fmt.Errorf("Error inserting the feed: %v", err)
-	}
-
-	followCreationParams := database.CreateFeedFollowParams {
-		ID: uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		UserID: userData.ID,
-		FeedID: feedData.ID,
-	}
-
-	_, err = s.db.CreateFeedFollow(context.Background(), followCreationParams)
-	if err != nil {
-		return fmt.Errorf("Error creating follow in the database: %v", err)
-	}
-
-	printStruct("The feed was successfully created.", feedData)
-	fmt.Printf("\nUser %v is now following feed %v.\n", userData.Name, feedData.Name)
-	return nil
-}
-
-func handlerFeeds(s *state, cmd command) error {
-	feedsData, err := s.db.GetFeeds(context.Background())
-	if err != nil {
-		return fmt.Errorf("Failed to fetch data from the database: %v", err)
-	}
-	for _, feedData := range feedsData {
-		printStruct("", feedData)
-	}
-	return nil
-}
-
-func handlerFollow(s *state, cmd command) error {
-	if len(cmd.Arguments) < 1 {
-		return fmt.Errorf("Error: expected 1 argument (url), and found %v", len(cmd.Arguments))
-	}
-	feedURL := cmd.Arguments[0]
-
-	userData, err := getCurrentUserData(s)
-	if err != nil {
-		return fmt.Errorf("Error querying the user data: %v", err)
-	}
-
-	feedData, err := s.db.GetFeedFromURL(context.Background(), feedURL)
-	if err != nil {
-		return fmt.Errorf("Error getting the feed data: %v", err)
-	}
-
-	creationParams := database.CreateFeedFollowParams {
-		ID: uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		UserID: userData.ID,
-		FeedID: feedData.ID,
-	}
-
-	followData, err := s.db.CreateFeedFollow(context.Background(), creationParams)
-	if err != nil {
-		return fmt.Errorf("Error creating follow in the database: %v", err)
-	}
-
-	fmt.Printf("\nUser %v is now following feed %v.\n", followData.Name, followData.Name_2)
-	return nil
-}
-
-func handlerFollowing(s *state, cmd command) error {
-	userData, err := getCurrentUserData(s)
-	if err != nil {
-		return fmt.Errorf("\nError fetching user data: %v\n", err)
-	}
-	feedFollows, err := s.db.GetFeedFollowsForUser(context.Background(), userData.ID)
-	if err != nil {
-		return fmt.Errorf("\nError fetching follow data: %v\n", err)
-	}
-	fmt.Printf("\nUser <%v> is following these feeds:\n", userData.Name)
-	for _, follow := range feedFollows {
-		fmt.Printf("\t- %v\n", follow.Name)
-	}
-	return nil
-}
-
 func getCurrentUserData(s * state) (database.User, error) {
 	userName, err := config.GetCurrentUser()
 	if err != nil {
@@ -308,20 +97,4 @@ func printStruct(description string, inter interface{}) {
 		return
 	}
 	fmt.Printf("\n%v\n%v\n", description, string(readable))
-}
-
-func (c *commands) run(s *state, cmd command) error {
-	if handler, ok := c.ValidCommands[cmd.Name]; ok && handler != nil {
-    	err := handler(s, cmd)
-		if err != nil {
-			fmt.Printf("\nError running the command: %v\n", err)
-		}
-	} else {
-    	return fmt.Errorf("Unknown or unregistered command: '%v'", cmd.Name)
-	}
-	return nil
-}
-
-func (c *commands) register(name string, f func(*state, command) error) {
-	c.ValidCommands[name] = f
 }
