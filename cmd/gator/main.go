@@ -31,8 +31,6 @@ type commands struct {
 }
 
 func main() {
-
-	fmt.Println("Setting up valid commands")
 	validCommands := make(map[string]func(*state, command) error)
 	commands := commands{
 		ValidCommands: validCommands,
@@ -44,15 +42,13 @@ func main() {
 	commands.register("addfeed", handlerAddFeed)
 	commands.register("feeds", handlerFeeds)
 	commands.register("follow", handlerFollow)
+	commands.register("following", handlerFollowing)
 	commands.register("reset", handlerReset)
 
-	fmt.Println("Setting up state struct")
-	fmt.Println("Reading configuration file")
 	currentConf, err := config.Read()
 	if err != nil {
 		fmt.Printf("\nError reading configuration: %v", err)
 	}
-	fmt.Println("Opening the database")
 	db, err := sql.Open("postgres", currentConf.DBURL)
 	if err != nil {
 		fmt.Printf("\nError connecting to the database: %v", err)
@@ -62,9 +58,7 @@ func main() {
 		Configuration: &currentConf,
 		db: dbQueries,
 	}
-	fmt.Println("Succesfully set up state")
 
-	fmt.Println("Reading user args")
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("Error: Received less arguments than expected")
@@ -72,7 +66,6 @@ func main() {
 	}
 	receivedCommand := getCommand(args)
 
-	fmt.Println("Attempting to run the command")
 	err =commands.run(currentState, receivedCommand)
 	if err != nil {
 		fmt.Printf("\nError running command: |%v|\n", err)
@@ -154,6 +147,10 @@ func handlerReset(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("Error clearing the feeds table: %v", err)
 	}
+	err = s.db.ResetFeedFollows(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error clearing the feed follows table: %v", err)
+	}
 	return nil
 }
 
@@ -182,7 +179,7 @@ func handlerAddFeed(s *state, cmd command) error {
 		return fmt.Errorf("Error querying the user data: %v", err)
 	}
 
-	creationParams := database.CreateFeedParams {	
+	feedCreationParams := database.CreateFeedParams {	
 		ID: uuid.New(),
 		Name: feedName,
 		Url: feedURL,
@@ -191,12 +188,26 @@ func handlerAddFeed(s *state, cmd command) error {
 		UpdatedAt: time.Now(),
 	}
 
-	feedData, err := s.db.CreateFeed(context.Background(), creationParams)
+	feedData, err := s.db.CreateFeed(context.Background(), feedCreationParams)
 	if err != nil {
 		return fmt.Errorf("Error inserting the feed: %v", err)
 	}
 
-	printStruct("The feed was successfully created", feedData)
+	followCreationParams := database.CreateFeedFollowParams {
+		ID: uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID: userData.ID,
+		FeedID: feedData.ID,
+	}
+
+	_, err = s.db.CreateFeedFollow(context.Background(), followCreationParams)
+	if err != nil {
+		return fmt.Errorf("Error creating follow in the database: %v", err)
+	}
+
+	printStruct("The feed was successfully created.", feedData)
+	fmt.Printf("\nUser %v is now following feed %v.\n", userData.Name, feedData.Name)
 	return nil
 }
 
@@ -211,17 +222,13 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollow(s * state, cmd command) error {
+func handlerFollow(s *state, cmd command) error {
 	if len(cmd.Arguments) < 1 {
 		return fmt.Errorf("Error: expected 1 argument (url), and found %v", len(cmd.Arguments))
 	}
 	feedURL := cmd.Arguments[0]
 
-	userName, err := config.GetCurrentUser()
-	if err != nil {
-		return fmt.Errorf("Error reading the current user from configuration: %v", err)
-	}
-	userData, err := s.db.GetUser(context.Background(), userName)
+	userData, err := getCurrentUserData(s)
 	if err != nil {
 		return fmt.Errorf("Error querying the user data: %v", err)
 	}
@@ -248,6 +255,34 @@ func handlerFollow(s * state, cmd command) error {
 	return nil
 }
 
+func handlerFollowing(s *state, cmd command) error {
+	userData, err := getCurrentUserData(s)
+	if err != nil {
+		return fmt.Errorf("\nError fetching user data: %v\n", err)
+	}
+	feedFollows, err := s.db.GetFeedFollowsForUser(context.Background(), userData.ID)
+	if err != nil {
+		return fmt.Errorf("\nError fetching follow data: %v\n", err)
+	}
+	fmt.Printf("\nUser <%v> is following these feeds:\n", userData.Name)
+	for _, follow := range feedFollows {
+		fmt.Printf("\t- %v\n", follow.Name)
+	}
+	return nil
+}
+
+func getCurrentUserData(s * state) (database.User, error) {
+	userName, err := config.GetCurrentUser()
+	if err != nil {
+		return database.User{}, fmt.Errorf("Error reading the current user from configuration: %v", err)
+	}
+	userData, err := s.db.GetUser(context.Background(), userName)
+	if err != nil {
+		return database.User{}, fmt.Errorf("Error querying the user data: %v", err)
+	}
+	return userData, nil;
+}
+
 func updateConfig(s *state) {
 	updatedConfig, err := config.Read()
 	if err != nil {
@@ -266,6 +301,15 @@ func getCommand(arguments []string) command {
 	}
 }
 
+func printStruct(description string, inter interface{}) {
+	readable, err := json.MarshalIndent(inter, "", "  ")
+	if err != nil {
+		fmt.Printf("\nError preparing struct for printing: %v", err)
+		return
+	}
+	fmt.Printf("\n%v\n%v\n", description, string(readable))
+}
+
 func (c *commands) run(s *state, cmd command) error {
 	if handler, ok := c.ValidCommands[cmd.Name]; ok && handler != nil {
     	err := handler(s, cmd)
@@ -280,13 +324,4 @@ func (c *commands) run(s *state, cmd command) error {
 
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.ValidCommands[name] = f
-}
-
-func printStruct(description string, inter interface{}) {
-	readable, err := json.MarshalIndent(inter, "", "  ")
-	if err != nil {
-		fmt.Printf("\nError preparing struct for printing: %v", err)
-		return
-	}
-	fmt.Printf("\n%v\n%v\n", description, string(readable))
 }

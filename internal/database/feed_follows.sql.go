@@ -125,3 +125,12 @@ func (q *Queries) GetFeedFollowsForUser(ctx context.Context, userID uuid.UUID) (
 	}
 	return items, nil
 }
+
+const resetFeedFollows = `-- name: ResetFeedFollows :exec
+DELETE FROM feed_follows
+`
+
+func (q *Queries) ResetFeedFollows(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, resetFeedFollows)
+	return err
+}
