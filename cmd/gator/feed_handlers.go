@@ -5,7 +5,6 @@ import (
 	"context"
 	"time"
 	"github.com/google/uuid"
-	"github.com/Mr-Rafael/gator/internal/config"
 	"github.com/Mr-Rafael/gator/internal/database"
 	"github.com/Mr-Rafael/gator/internal/rss"
 )
@@ -20,20 +19,12 @@ func handlerAgg(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, userData database.User) error {
 	if len(cmd.Arguments) < 2 {
 		return fmt.Errorf("Error: expected 2 arguments (name, url), and found %v", len(cmd.Arguments))
 	}
 	feedName := cmd.Arguments[0]
 	feedURL := cmd.Arguments[1]
-	userName, err := config.GetCurrentUser()
-	if err != nil {
-		return fmt.Errorf("Error reading the current user from configuration: %v", err)
-	}
-	userData, err := s.db.GetUser(context.Background(), userName)
-	if err != nil {
-		return fmt.Errorf("Error querying the user data: %v", err)
-	}
 
 	feedCreationParams := database.CreateFeedParams {	
 		ID: uuid.New(),
@@ -63,7 +54,7 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 
 	printStruct("The feed was successfully created.", feedData)
-	fmt.Printf("\nUser %v is now following feed %v.\n", userData.Name, feedData.Name)
+	fmt.Printf("\nUser <%v> is now following '%v'.\n", userData.Name, feedData.Name)
 	return nil
 }
 
@@ -78,16 +69,11 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, userData database.User) error {
 	if len(cmd.Arguments) < 1 {
 		return fmt.Errorf("Error: expected 1 argument (url), and found %v", len(cmd.Arguments))
 	}
 	feedURL := cmd.Arguments[0]
-
-	userData, err := getCurrentUserData(s)
-	if err != nil {
-		return fmt.Errorf("Error querying the user data: %v", err)
-	}
 
 	feedData, err := s.db.GetFeedFromURL(context.Background(), feedURL)
 	if err != nil {
@@ -107,15 +93,11 @@ func handlerFollow(s *state, cmd command) error {
 		return fmt.Errorf("Error creating follow in the database: %v", err)
 	}
 
-	fmt.Printf("\nUser %v is now following feed %v.\n", followData.Name, followData.Name_2)
+	fmt.Printf("\nUser <%v> is now following '%v'.\n", followData.Name, followData.Name_2)
 	return nil
 }
 
-func handlerFollowing(s *state, cmd command) error {
-	userData, err := getCurrentUserData(s)
-	if err != nil {
-		return fmt.Errorf("\nError fetching user data: %v\n", err)
-	}
+func handlerFollowing(s *state, cmd command, userData database.User) error {
 	feedFollows, err := s.db.GetFeedFollowsForUser(context.Background(), userData.ID)
 	if err != nil {
 		return fmt.Errorf("\nError fetching follow data: %v\n", err)

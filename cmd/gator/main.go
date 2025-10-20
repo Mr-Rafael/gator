@@ -26,10 +26,10 @@ func main() {
 	commands.register("register", handlerRegister)
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
-	commands.register("addfeed", handlerAddFeed)
+	commands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	commands.register("feeds", handlerFeeds)
-	commands.register("follow", handlerFollow)
-	commands.register("following", handlerFollowing)
+	commands.register("follow", middlewareLoggedIn(handlerFollow))
+	commands.register("following", middlewareLoggedIn(handlerFollowing))
 	commands.register("reset", handlerReset)
 
 	currentConf, err := config.Read()
@@ -97,4 +97,31 @@ func printStruct(description string, inter interface{}) {
 		return
 	}
 	fmt.Printf("\n%v\n%v\n", description, string(readable))
+}
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	currentConf, err := config.Read()
+	if err != nil {
+		fmt.Printf("\nError reading configuration: %v", err)
+		return nil
+	}
+	db, err := sql.Open("postgres", currentConf.DBURL)
+	if err != nil {
+		fmt.Printf("\nError connecting to the database: %v", err)
+		return nil
+	}
+	dbQueries := database.New(db)
+	
+	userName, err := config.GetCurrentUser()
+	if err != nil {
+		return nil
+	}
+	userData, err := dbQueries.GetUser(context.Background(), userName)
+	if err != nil {
+		return nil
+	}
+
+	return func(s *state, cmd command) error {
+		return handler(s, cmd, userData)
+	}
 }

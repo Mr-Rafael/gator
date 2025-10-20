@@ -14,6 +14,11 @@ type commands struct {
 }
 
 func (c *commands) run(s *state, cmd command) error {
+	fmt.Printf("\nRunning command [%v] with parameters:\n", cmd.Name)
+	for _, arg := range cmd.Arguments {
+		fmt.Printf(" > %v\n", arg)
+	}
+
 	if handler, ok := c.ValidCommands[cmd.Name]; ok && handler != nil {
     	err := handler(s, cmd)
 		if err != nil {
