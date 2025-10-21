@@ -108,3 +108,28 @@ func handlerFollowing(s *state, cmd command, userData database.User) error {
 	}
 	return nil
 }
+
+
+func handlerUnfollow(s *state, cmd command, userData database.User) error {
+	if len(cmd.Arguments) < 1 {
+		return fmt.Errorf("Error running 'following' command: 1 argument is needed, but received %v", len(cmd.Arguments))
+	}
+	feedURL := cmd.Arguments[0]
+
+	feedData, err := s.db.GetFeedFromURL(context.Background(), feedURL)
+	if err != nil {
+		return fmt.Errorf("Error getting the feed data: %v", err)
+	}
+
+	deleteParams := database.DeleteFollowParams {
+		UserID: userData.ID,
+		FeedID: feedData.ID,
+	}
+	err = s.db.DeleteFollow(context.Background(), deleteParams)
+	if err != nil {
+		return fmt.Errorf("\nError fetching follow data: %v\n", err)
+	}
+	fmt.Printf("\nUser <%v> is no longer following feed '%v'", userData.Name, feedData.Name)
+
+	return nil
+}
