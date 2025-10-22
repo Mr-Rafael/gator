@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ WITH inserted AS (
     )
     RETURNING id, user_id, feed_id
 )
-SELECT i.id, i.user_id, feed_id, users.id, users.created_at, users.updated_at, users.name, feeds.id, feeds.name, url, feeds.user_id, feeds.created_at, feeds.updated_at
+SELECT i.id, i.user_id, feed_id, users.id, users.created_at, users.updated_at, users.name, feeds.id, feeds.name, url, feeds.user_id, feeds.created_at, feeds.updated_at, last_fetched_at
 FROM inserted i
 INNER JOIN users
     ON i.user_id = users.id
@@ -41,19 +42,20 @@ type CreateFeedFollowParams struct {
 }
 
 type CreateFeedFollowRow struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	FeedID      uuid.UUID
-	ID_2        uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Name        string
-	ID_3        uuid.UUID
-	Name_2      string
-	Url         string
-	UserID_2    uuid.UUID
-	CreatedAt_2 time.Time
-	UpdatedAt_2 time.Time
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	FeedID        uuid.UUID
+	ID_2          uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Name          string
+	ID_3          uuid.UUID
+	Name_2        string
+	Url           string
+	UserID_2      uuid.UUID
+	CreatedAt_2   time.Time
+	UpdatedAt_2   time.Time
+	LastFetchedAt sql.NullTime
 }
 
 func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowParams) (CreateFeedFollowRow, error) {
@@ -79,6 +81,7 @@ func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowPara
 		&i.UserID_2,
 		&i.CreatedAt_2,
 		&i.UpdatedAt_2,
+		&i.LastFetchedAt,
 	)
 	return i, err
 }

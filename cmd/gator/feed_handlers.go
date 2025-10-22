@@ -4,18 +4,23 @@ import (
 	"fmt"
 	"context"
 	"time"
+	"database/sql"
 	"github.com/google/uuid"
 	"github.com/Mr-Rafael/gator/internal/database"
 	"github.com/Mr-Rafael/gator/internal/rss"
 )
 
 func handlerAgg(s *state, cmd command) error {
-	url := "https://www.wagslane.dev/index.xml"
-	feed, err := rss.FetchFeed(context.Background(), url)
-	if err != nil {
-		fmt.Printf("\nError fetching the feed: %v\n", err)
+	if len(cmd.Arguments) < 1 {
+		return fmt.Errorf("Error: expected 1 argument (time between reqs), and found %v", len(cmd.Arguments))
 	}
-	printStruct("Obtained the following feed:", feed)
+	duration, err := time.ParseDuration(cmd.Arguments[0])
+	if err != nil {
+		return fmt.Errorf("Error parsing the duration argument received: %v", err)
+	}
+	fmt.Printf("\nCollecting feeds every %v\n", duration)
+
+	fmt.Println("scrapeFeeds stub")
 	return nil
 }
 
@@ -130,6 +135,38 @@ func handlerUnfollow(s *state, cmd command, userData database.User) error {
 		return fmt.Errorf("\nError fetching follow data: %v\n", err)
 	}
 	fmt.Printf("\nUser <%v> is no longer following feed '%v'", userData.Name, feedData.Name)
+
+	return nil
+}
+
+func scrapeFeeds(s *state) error {
+	feedData, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error getting next feed to update from the database: %v", err)
+	}
+
+	markFetchedParams := database.MarkFeedFetchedParams {
+		ID: feedData.ID,
+		LastFetchedAt: sql.NullTime{
+			Time:  time.Now(),
+			Valid: true,
+		},
+	}
+
+	err = s.db.MarkFeedFetched(context.Background(), markFetchedParams)
+	if err != nil {
+		return fmt.Errorf("Error marking the feed as updated in the database: %v", err)
+	}	
+
+	feedContent, err := rss.FetchFeed(context.Background(), feedData.Url)
+	if err != nil {
+		return fmt.Errorf("Error fetching the feed '%v' from URL: %v", feedData.Name, err)
+	}
+
+	fmt.Println("Obtained the following feed items: ")
+	for _, feedItem := range feedContent.Channel.Item {
+		fmt.Printf(" - %v\n", feedItem.Title)
+	}
 
 	return nil
 }
