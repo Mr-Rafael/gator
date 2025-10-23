@@ -20,7 +20,15 @@ func handlerAgg(s *state, cmd command) error {
 	}
 	fmt.Printf("\nCollecting feeds every %v\n", duration)
 
-	fmt.Println("scrapeFeeds stub")
+	ticker := time.NewTicker(duration)
+	defer ticker.Stop()
+	for ;; <- ticker.C {
+		fmt.Println("\nIt's scrapin' time!")
+		err = scrapeFeeds(s)
+		if err != nil {
+			return fmt.Errorf("Error scraping feeds: %v", err)
+		}
+	}
 	return nil
 }
 
