@@ -171,10 +171,39 @@ func scrapeFeeds(s *state) error {
 		return fmt.Errorf("Error fetching the feed '%v' from URL: %v", feedData.Name, err)
 	}
 
-	fmt.Println("Obtained the following feed items: ")
+	fmt.Println("Storing the posts on the Database: ")
+
 	for _, feedItem := range feedContent.Channel.Item {
-		fmt.Printf(" - %v\n", feedItem.Title)
+		fmt.Printf("- Storing '%v'\n", feedItem.Title)
+		savePostParams := database.CreatePostParams {
+			ID: uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Title: feedItem.Title,
+			Url: feedItem.Link,
+			Description: sql.NullString{
+				String: feedItem.Description,
+        		Valid: true,
+    		},
+			PublishedAt: parseNullableTime(feedItem.PubDate),
+			FeedID:	feedData.ID,
+		}
+		create_error := s.db.CreatePost(context.Background(), savePostParams)
+		if create_error != nil {
+			return fmt.Errorf("Error storing the post on the database: %v", create_error)
+		}
 	}
 
+	fmt.Println("\nDone scrapin'!\n")
+
 	return nil
+}
+
+func parseNullableTime(input string) sql.NullTime {
+    layout := "Mon, 01 Jan 2001 15:04:05 -0700"
+    t, err := time.Parse(layout, input)
+    if err != nil {
+        return sql.NullTime{Valid: false} // send NULL
+    }
+    return sql.NullTime{Time: t, Valid: true}
 }
