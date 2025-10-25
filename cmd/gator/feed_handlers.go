@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"context"
 	"time"
+	"strconv"
 	"database/sql"
 	"github.com/google/uuid"
 	"github.com/Mr-Rafael/gator/internal/database"
@@ -147,6 +148,37 @@ func handlerUnfollow(s *state, cmd command, userData database.User) error {
 	return nil
 }
 
+func handlerBrowse(s *state, cmd command, userData database.User) error {
+	var err error
+
+	limit := 2
+	if len(cmd.Arguments) >= 1 {
+		limit, err = strconv.Atoi(cmd.Arguments[0])
+		if err != nil {
+			return fmt.Errorf("Expected a numeric parameter for command. %v", err)
+		}
+	}
+	currentUser, err := getCurrentUserData(s)
+	if err != nil {
+		return fmt.Errorf("Error getting current user info: %v", err)
+	}
+
+	getPostsParams := database.GetPostsForUserParams{
+		UserID: currentUser.ID,
+		Limit: int32(limit),
+	}
+	posts, err := s.db.GetPostsForUser(context.Background(), getPostsParams)
+	if err != nil {
+		return fmt.Errorf("Error getting posts for user: %v", err)
+	}
+
+	fmt.Println("Got the following posts:")
+	for _, post := range posts {
+		fmt.Printf(" - %v\n", post.Title)
+	}
+	return nil
+}
+
 func scrapeFeeds(s *state) error {
 	feedData, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
@@ -200,10 +232,21 @@ func scrapeFeeds(s *state) error {
 }
 
 func parseNullableTime(input string) sql.NullTime {
-    layout := "Mon, 01 Jan 2001 15:04:05 -0700"
-    t, err := time.Parse(layout, input)
-    if err != nil {
-        return sql.NullTime{Valid: false} // send NULL
+	layouts := []string{
+        time.RFC1123Z,
+        time.RFC1123,
+        time.RFC3339,
+        "2006-01-02 15:04:05",
+        "02 Jan 2006 15:04:05 MST",
+        "Mon Jan 2 15:04:05 2006",
     }
-    return sql.NullTime{Time: t, Valid: true}
+
+    for _, layout := range layouts {
+        if t, err := time.Parse(layout, input); err == nil {
+            return sql.NullTime{Time: t, Valid: true}
+        }
+    }
+
+    return sql.NullTime{Valid: false}
+
 }
