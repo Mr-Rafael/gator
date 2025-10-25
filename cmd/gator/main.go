@@ -22,12 +22,12 @@ func main() {
 	commands := commands{
 		ValidCommands: validCommands,
 	}
-	commands.register("login", handlerLogin)
 	commands.register("register", handlerRegister)
+	commands.register("login", handlerLogin)
 	commands.register("users", handlerUsers)
-	commands.register("agg", handlerAgg)
 	commands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	commands.register("feeds", handlerFeeds)
+	commands.register("agg", handlerAgg)
 	commands.register("follow", middlewareLoggedIn(handlerFollow))
 	commands.register("following", middlewareLoggedIn(handlerFollowing))
 	commands.register("unfollow", middlewareLoggedIn(handlerUnfollow))

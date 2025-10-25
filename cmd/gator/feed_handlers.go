@@ -174,9 +174,17 @@ func handlerBrowse(s *state, cmd command, userData database.User) error {
 
 	fmt.Println("Got the following posts:")
 	for _, post := range posts {
-		fmt.Printf(" - %v\n", post.Title)
+		printPost(post)
 	}
 	return nil
+}
+
+func printPost(p database.Post) {
+	fmt.Printf("\n| %v |\n", p.Title)
+	fmt.Printf("----------\n")
+	fmt.Printf("Published on: %v\n\n", p.PublishedAt)
+	fmt.Printf("%v\n\n", p.Description)
+	fmt.Printf("Link: %v\n", p.Url)
 }
 
 func scrapeFeeds(s *state) error {

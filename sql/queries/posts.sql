@@ -19,3 +19,6 @@ INNER JOIN feed_follows
 WHERE feed_follows.user_id = $1
 ORDER BY posts.published_at DESC
 LIMIT $2;
+
+-- name: ResetPosts :exec
+DELETE FROM posts;

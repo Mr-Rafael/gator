@@ -18,5 +18,9 @@ func handlerReset(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("Error clearing the feed follows table: %v", err)
 	}
+	err = s.db.ResetPosts(context.Background())
+	if err != nil {
+		return fmt.Errorf("Error clearing the posts table: %v", err)
+	}
 	return nil
 }

@@ -98,3 +98,12 @@ func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams
 	}
 	return items, nil
 }
+
+const resetPosts = `-- name: ResetPosts :exec
+DELETE FROM posts
+`
+
+func (q *Queries) ResetPosts(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, resetPosts)
+	return err
+}
